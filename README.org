@@ -1,0 +1,78 @@
+#+TITLE: Bitcoin HD wallets research
+#+OPTIONS: ^:nil
+#+PROPERTY: header-args:sh :session *shell bitcoin-hd-wallets-research sh* :results silent raw
+#+PROPERTY: header-args:python :session *shell bitcoin-hd-wallets-research python* :results silent raw
+
+** System environment
+
+- Debian 9.11
+
+- Python 3.7.0
+
+Python modules:
+
+- coincurve 13.0.0
+
+** Imports
+
+#+BEGIN_SRC python
+import coincurve
+import hashlib
+import hmac
+#+END_SRC
+
+** Constants
+
+#+BEGIN_SRC python
+MASTER_SEED_CODE = b"Bitcoin seed"
+DIGESTMOD = hashlib.sha512
+#+END_SRC
+
+** Seed
+
+Create seed, for example with python-mnemonic.
+
+#+BEGIN_SRC python
+master_seed_hex = "b5cf116d11d4338b1a5d0971ba1fe40d19d360d7f6014c7a6fc8925fd1e18aaa8d539c5756f06e57bfc24c74a3641c93af9553d907d6dd66f791d4e86d190840"
+master_seed = bytes.fromhex(master_seed_hex)
+#+END_SRC
+
+** Derive a masterkey and a chaincode
+
+#+BEGIN_SRC python :results replace code
+seed = hmac.new(b"Bitcoin seed", master_seed, digestmod=DIGESTMOD).digest()
+master_chaincode, master_key = seed[32:], seed[:32]
+master_chaincode.hex(), master_key.hex()
+#+END_SRC
+
+#+RESULTS:
+#+begin_src python
+('d78b76396ada0500f7e7eb56f21a158e7b6a8256d4f734e9e51c3d2f0405eca6', 'b0288fdef617a458c31fca5766c153239dfd65eac5fed8aac47ebef13ed5f6e4')
+#+end_src
+
+** Derive a child
+
+#+BEGIN_SRC python
+privkey = master_key
+chaincode = master_chaincode
+index = 0x80000000 + 1
+#+END_SRC
+
+#+BEGIN_SRC python :results replace code
+salt = b'\x00' + privkey + index.to_bytes(4, "big")
+data = hmac.new(chaincode, salt, DIGESTMOD).digest()
+child_private = coincurve.PrivateKey(data[:32]).add(privkey)
+child_private = bytes.fromhex(child_private.to_hex())
+child_chaincode = data[32:]
+child_chaincode.hex(), child_private.hex()
+#+END_SRC
+
+#+RESULTS:
+#+begin_src python
+('d2f88eab271242b8ce9418c7ef88112e9c23c7764aaef30f456da0c4492eaab9', '1cb319caf137479e8bdef3ff161895fff9db693f03f5f4f4ad73b74e5ebbcbc7')
+#+end_src
+
+#+BEGIN_SRC python
+chaincode = child_chaincode
+privkey = child_private
+#+END_SRC
